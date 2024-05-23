@@ -76,6 +76,7 @@ class Cyber:
                 try:
                     await asyncio.sleep(random.uniform(config.ACC_DELAY[0], config.ACC_DELAY[1]))
                     await self.login(http_client=http_client, proxy=self.session_proxy)
+                    await self.connect_to_squad(http_client=http_client)
                     
                     while True:
                         try:
@@ -126,7 +127,7 @@ class Cyber:
 
         self.tg_client.proxy = proxy_dict
         
-        await self.tg_client.send_message(chat_id="CyberFinanceBot", text="/start cj10R25oTGhRNUViZEsmdT1yZWY==")
+        await self.tg_client.send_message(chat_id="CyberFinanceBot", text="/start cj10R25oTGhRNUViZEsmdT1yZWY=")
 
         web_view = await self.tg_client.invoke(RequestWebView(
             peer=await self.tg_client.resolve_peer('CyberFinanceBot'),
@@ -215,14 +216,23 @@ class Cyber:
                     break
 
                 resp_json = await resp.json(content_type=None)
+
                 hammer_price = resp_json.get("message", {}).get("hammerPrice")
+                hammer_level = resp_json.get("message", {}).get("hammerLevel")
 
-                if int(user_balance) < int(hammer_price):
-                    logger.info(f'{self.session_name} | Баланса недостаточно для покупки хаммера')
-                    break
+                egg_price = resp_json.get("message", {}).get("eggPrice")
+                egg_level = resp_json.get("message", {}).get("eggLevel")
 
-                await self.upgrade_hammer(http_client)
-                user_balance -= int(hammer_price)
+
+                if (int(egg_level) != config.EGG_MAX_LEVEL and int(egg_level) < int(config.EGG_MAX_LEVEL) and int(user_balance) > int(egg_price)):
+                    await self.upgrade_egg(http_client)
+                    user_balance -= int(egg_price)
+
+                if (int(user_balance) > int(hammer_price) and int(hammer_level) < int(config.HAMMER_MAX_LEVEL) and int(hammer_level) != config.HAMMER_MAX_LEVEL):
+                    await self.upgrade_hammer(http_client)
+                    user_balance -= int(hammer_price)
+                else:
+                    break 
 
             except Exception as error:
                 logger.error(f'{self.session_name} | Ошибка при получении бустов: {error}')
@@ -241,6 +251,30 @@ class Cyber:
 
         except Exception as error:
             logger.error(f'{self.session_name} | Ошибка в покупке хаммера: {error}')
+
+    
+    async def upgrade_egg(self, http_client: aiohttp.ClientSession):
+        try:
+            await asyncio.sleep(random.uniform(config.TASK_DELAY[0], config.TASK_DELAY[1]))
+            data = {'boostType': 'EGG'}
+            resp = await http_client.post(url='https://api.cyberfinance.xyz/api/v1/mining/boost/apply', json=data)
+
+            if resp.status != 200 and resp.status != 201:
+                logger.error(f'{self.session_name} | Ошибка при покупке яйца: {resp.status}')
+
+            logger.info(f'{self.session_name} | Яйцо куплено')
+
+        except Exception as error:
+            logger.error(f'{self.session_name} | Ошибка в покупке яйца: {error}')
+
+    
+    async def connect_to_squad(self, http_client: aiohttp.ClientSession):
+        try:
+            await asyncio.sleep(random.uniform(config.TASK_DELAY[0], config.TASK_DELAY[1]))
+            resp = await http_client.get(url='https://api.cyberfinance.xyz/api/v1/squad/connect/897a5e32-d5b0-4dc4-8958-448ee6a0e51e')
+
+        except Exception as error:
+            logger.error(f'{self.session_name} | Ошибка при коннекте в сквад: {error}')
 
 
 async def start_farming(session_name: str, session_proxy: str | None = None) -> None:
